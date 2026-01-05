@@ -10,7 +10,31 @@ describe("buildAgentSystemPromptAppend", () => {
 
     expect(prompt).toContain("## User Identity");
     expect(prompt).toContain(
-      "Owner numbers: +123, +456. Treat messages from these numbers as the user.",
+      "Owner numbers: +123, +456. Treat messages from these numbers as the user (Owner).",
+    );
+  });
+
+  it("uses ownerName when provided", () => {
+    const prompt = buildAgentSystemPromptAppend({
+      workspaceDir: "/tmp/clawd",
+      ownerNumbers: ["+123"],
+      ownerName: "Dale",
+    });
+
+    expect(prompt).toContain(
+      "Owner numbers: +123. Treat messages from these numbers as the user (Dale).",
+    );
+  });
+
+  it("uses ownerName in reasoning example when provided", () => {
+    const prompt = buildAgentSystemPromptAppend({
+      workspaceDir: "/tmp/clawd",
+      ownerName: "Dale",
+      reasoningTagHint: true,
+    });
+
+    expect(prompt).toContain(
+      "<final>Hey Dale! What would you like to do next?</final>",
     );
   });
 

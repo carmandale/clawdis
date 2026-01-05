@@ -203,6 +203,22 @@ function mapThinkingLevel(level?: ThinkLevel): ThinkingLevel {
   return level;
 }
 
+function resolveOwnerName(config?: ClawdisConfig): string {
+  const env = process.env.CLAWDIS_OWNER_NAME?.trim();
+  if (env) return env;
+
+  const cfgAny = config as unknown as Record<string, unknown> | undefined;
+  const routing = cfgAny?.routing as Record<string, unknown> | undefined;
+  const fromRouting = routing?.ownerName;
+  if (typeof fromRouting === "string" && fromRouting.trim())
+    return fromRouting.trim();
+
+  const fromTop = cfgAny?.ownerName;
+  if (typeof fromTop === "string" && fromTop.trim()) return fromTop.trim();
+
+  return "Owner";
+}
+
 function resolveModel(
   provider: string,
   modelId: string,
@@ -392,6 +408,7 @@ export async function runEmbeddedPiAgent(params: {
             defaultThinkLevel: params.thinkLevel,
             extraSystemPrompt: params.extraSystemPrompt,
             ownerNumbers: params.ownerNumbers,
+            ownerName: resolveOwnerName(params.config),
             reasoningTagHint,
             runtimeInfo,
             sandboxInfo,

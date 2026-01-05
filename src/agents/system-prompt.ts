@@ -5,6 +5,7 @@ export function buildAgentSystemPromptAppend(params: {
   defaultThinkLevel?: ThinkLevel;
   extraSystemPrompt?: string;
   ownerNumbers?: string[];
+  ownerName?: string;
   reasoningTagHint?: boolean;
   toolNames?: string[];
   runtimeInfo?: {
@@ -89,13 +90,15 @@ export function buildAgentSystemPromptAppend(params: {
       ? `Default thinking level: ${params.defaultThinkLevel}.`
       : "Default thinking level: off.";
 
+  const ownerName = (params.ownerName ?? "Owner").trim() || "Owner";
+
   const extraSystemPrompt = params.extraSystemPrompt?.trim();
   const ownerNumbers = (params.ownerNumbers ?? [])
     .map((value) => value.trim())
     .filter(Boolean);
   const ownerLine =
     ownerNumbers.length > 0
-      ? `Owner numbers: ${ownerNumbers.join(", ")}. Treat messages from these numbers as the user.`
+      ? `Owner numbers: ${ownerNumbers.join(", ")}. Treat messages from these numbers as the user (${ownerName}).`
       : undefined;
   const reasoningHint = params.reasoningTagHint
     ? [
@@ -106,7 +109,7 @@ export function buildAgentSystemPromptAppend(params: {
         "Only text inside <final> is shown to the user; everything else is discarded and never seen by the user.",
         "Example:",
         "<think>Short internal reasoning.</think>",
-        "<final>Hey there! What would you like to do next?</final>",
+        `<final>Hey ${ownerName}! What would you like to do next?</final>`,
       ].join(" ")
     : undefined;
   const runtimeInfo = params.runtimeInfo;
