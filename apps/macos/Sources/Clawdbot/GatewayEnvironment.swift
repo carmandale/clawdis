@@ -25,7 +25,10 @@ struct Semver: Comparable, CustomStringConvertible, Sendable {
               let major = Int(parts[0]),
               let minor = Int(parts[1])
         else { return nil }
-        let patch = Int(parts[2]) ?? 0
+
+        // Support versions like 2026.1.11-3 (strip prerelease/build suffixes).
+        let patchToken = parts[2].split(separator: "-").first?.split(separator: "+").first
+        let patch = patchToken.flatMap { Int($0) } ?? 0
         return Semver(major: major, minor: minor, patch: patch)
     }
 
@@ -77,9 +80,15 @@ enum GatewayEnvironment {
         return stored > 0 ? stored : 18789
     }
 
+    static func expectedGatewayVersionString() -> String? {
+        let raw = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
     static func expectedGatewayVersion() -> Semver? {
-        let bundleVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        return Semver.parse(bundleVersion)
+        Semver.parse(self.expectedGatewayVersionString())
     }
 
     // Exposed for tests so we can inject fake version checks without rewriting bundle metadata.
