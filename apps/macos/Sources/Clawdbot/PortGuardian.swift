@@ -351,9 +351,13 @@ actor PortGuardian {
             if port == GatewayEnvironment.gatewayPort() { return cmd.contains("ssh") }
             return false
         case .local:
-            if !cmd.contains("clawdbot") { return false }
+            // In local mode we expect a Clawdbot gateway (often a node process). Be permissive enough
+            // to avoid killing the launchd-managed gateway, but strict enough to avoid unrelated servers.
             if full.contains("gateway-daemon") { return true }
-            // If args are unavailable, treat a clawdbot listener as expected.
+            if full.contains("/clawdis-app/dist/index.js") && full.contains(" gateway") { return true }
+            if full.contains("/clawdbot/dist/entry.js") && full.contains(" gateway") { return true }
+            if cmd.contains("clawdbot") { return true }
+            // If args are unavailable, treat a clawdbot-named listener as expected.
             return full == cmd
         case .unconfigured:
             return false
