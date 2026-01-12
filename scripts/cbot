@@ -7,7 +7,7 @@ SERVICE="com.clawdbot.gateway"
 
 case "${1:-status}" in
     status)
-        if pgrep -f "clawdbot gateway" > /dev/null; then
+        if pgrep -f "clawdis-app/dist/index.js gateway" > /dev/null; then
             echo "✅ Chip gateway is running"
             echo ""
             # Show Discord status from recent log
@@ -22,7 +22,7 @@ case "${1:-status}" in
         ;;
     restart)
         echo "🔄 Restarting Chip gateway..."
-        pkill -f "clawdbot gateway" 2>/dev/null || true
+        pkill -f "clawdis-app/dist/index.js gateway" 2>/dev/null || true
         sleep 2
         if launchctl list "$SERVICE" &>/dev/null; then
             launchctl kickstart -k "gui/$(id -u)/$SERVICE" 2>/dev/null || \
@@ -35,7 +35,7 @@ case "${1:-status}" in
         ;;
     stop)
         echo "⏹️  Stopping Chip gateway..."
-        pkill -f "clawdbot gateway" 2>/dev/null
+        pkill -f "clawdis-app/dist/index.js gateway" 2>/dev/null
         echo "Stopped"
         ;;
     logs)
