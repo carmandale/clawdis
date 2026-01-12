@@ -1,0 +1,54 @@
+#!/bin/bash
+# Chip (Clawdbot) gateway helper
+# Usage: chip [status|restart|stop|logs|tail]
+
+PLIST="$HOME/Library/LaunchAgents/com.clawdbot.gateway.plist"
+SERVICE="com.clawdbot.gateway"
+
+case "${1:-status}" in
+    status)
+        if pgrep -f "clawdbot gateway" > /dev/null; then
+            echo "✅ Chip gateway is running"
+            echo ""
+            # Show Discord status from recent log
+            if [ -f /tmp/clawdbot/gateway.log ]; then
+                grep -i "discord.*logged in" /tmp/clawdbot/gateway.log 2>/dev/null | tail -1 || \
+                grep -i "discord" /tmp/clawdbot/gateway.log 2>/dev/null | tail -1
+            fi
+        else
+            echo "❌ Chip gateway is NOT running"
+            echo "   Run: chip restart"
+        fi
+        ;;
+    restart)
+        echo "🔄 Restarting Chip gateway..."
+        pkill -f "clawdbot gateway" 2>/dev/null || true
+        sleep 2
+        if launchctl list "$SERVICE" &>/dev/null; then
+            launchctl kickstart -k "gui/$(id -u)/$SERVICE" 2>/dev/null || \
+            (launchctl unload "$PLIST" 2>/dev/null; launchctl load "$PLIST")
+        else
+            cd ~/clawdis-app && nohup pnpm clawdbot gateway > /tmp/clawdbot/gateway.log 2>&1 &
+        fi
+        sleep 3
+        $0 status
+        ;;
+    stop)
+        echo "⏹️  Stopping Chip gateway..."
+        pkill -f "clawdbot gateway" 2>/dev/null
+        echo "Stopped"
+        ;;
+    logs)
+        if [ -f /tmp/clawdbot/gateway.log ]; then
+            cat /tmp/clawdbot/gateway.log | tail -50
+        else
+            echo "No log file found"
+        fi
+        ;;
+    tail)
+        tail -f /tmp/clawdbot/gateway.log 2>/dev/null || echo "No log file"
+        ;;
+    *)
+        echo "Usage: chip [status|restart|stop|logs|tail]"
+        ;;
+esac
