@@ -1,54 +1,81 @@
 #!/bin/bash
 # Chip (Clawdbot) gateway helper
-# Usage: chip [status|restart|stop|logs|tail]
+# Usage: cbot [status|restart|stop|logs|tail|app|tui]
 
+ROOT="$HOME/clawdis-app"
+APP="$ROOT/dist/Clawdbot.app"
+LOG_DIR="$HOME/.clawdbot/logs"
+LOG="$LOG_DIR/gateway.log"
+ERR_LOG="$LOG_DIR/gateway.err.log"
 PLIST="$HOME/Library/LaunchAgents/com.clawdbot.gateway.plist"
 SERVICE="com.clawdbot.gateway"
+PROC_PATTERN="clawdis-app/dist/index.js gateway"
 
 case "${1:-status}" in
-    status)
-        if pgrep -f "clawdis-app/dist/index.js gateway" > /dev/null; then
-            echo "✅ Chip gateway is running"
-            echo ""
-            # Show Discord status from recent log
-            if [ -f /tmp/clawdbot/gateway.log ]; then
-                grep -i "discord.*logged in" /tmp/clawdbot/gateway.log 2>/dev/null | tail -1 || \
-                grep -i "discord" /tmp/clawdbot/gateway.log 2>/dev/null | tail -1
-            fi
-        else
-            echo "❌ Chip gateway is NOT running"
-            echo "   Run: chip restart"
-        fi
-        ;;
-    restart)
-        echo "🔄 Restarting Chip gateway..."
-        pkill -f "clawdis-app/dist/index.js gateway" 2>/dev/null || true
-        sleep 2
-        if launchctl list "$SERVICE" &>/dev/null; then
-            launchctl kickstart -k "gui/$(id -u)/$SERVICE" 2>/dev/null || \
-            (launchctl unload "$PLIST" 2>/dev/null; launchctl load "$PLIST")
-        else
-            cd ~/clawdis-app && nohup pnpm clawdbot gateway > /tmp/clawdbot/gateway.log 2>&1 &
-        fi
-        sleep 3
-        $0 status
-        ;;
-    stop)
-        echo "⏹️  Stopping Chip gateway..."
-        pkill -f "clawdis-app/dist/index.js gateway" 2>/dev/null
-        echo "Stopped"
-        ;;
-    logs)
-        if [ -f /tmp/clawdbot/gateway.log ]; then
-            cat /tmp/clawdbot/gateway.log | tail -50
-        else
-            echo "No log file found"
-        fi
-        ;;
-    tail)
-        tail -f /tmp/clawdbot/gateway.log 2>/dev/null || echo "No log file"
-        ;;
-    *)
-        echo "Usage: chip [status|restart|stop|logs|tail]"
-        ;;
+  status)
+    if pgrep -f "$PROC_PATTERN" > /dev/null; then
+      echo "✅ Chip gateway is running"
+      echo ""
+      # Show Discord status from recent log
+      if [ -f "$LOG" ]; then
+        grep -i "discord.*logged in" "$LOG" 2>/dev/null | tail -1 || \
+        grep -i "discord" "$LOG" 2>/dev/null | tail -1
+      fi
+    else
+      echo "❌ Chip gateway is NOT running"
+      echo "   Run: cbot restart"
+    fi
+    ;;
+
+  restart)
+    echo "🔄 Restarting Chip gateway..."
+    pkill -f "$PROC_PATTERN" 2>/dev/null || true
+    sleep 2
+
+    if launchctl list "$SERVICE" &>/dev/null; then
+      launchctl kickstart -k "gui/$(id -u)/$SERVICE" 2>/dev/null || \
+      (launchctl unload "$PLIST" 2>/dev/null; launchctl load "$PLIST")
+    else
+      mkdir -p "$LOG_DIR"
+      cd "$ROOT" && nohup pnpm clawdbot gateway > "$LOG" 2>"$ERR_LOG" &
+    fi
+
+    sleep 3
+    "$0" status
+    ;;
+
+  stop)
+    echo "⏹️  Stopping Chip gateway..."
+    pkill -f "$PROC_PATTERN" 2>/dev/null || true
+    echo "Stopped"
+    ;;
+
+  logs)
+    if [ -f "$LOG" ]; then
+      tail -50 "$LOG"
+    else
+      echo "No log file found at $LOG"
+    fi
+    ;;
+
+  tail)
+    tail -f "$LOG" 2>/dev/null || echo "No log file at $LOG"
+    ;;
+
+  app|open|launch)
+    if [ -d "$APP" ]; then
+      open "$APP"
+    else
+      echo "Clawdbot.app not found at $APP"
+      echo "Build it with: (cd ~/clawdis-app && pnpm mac:package)"
+    fi
+    ;;
+
+  tui)
+    cd "$ROOT" && pnpm clawdbot tui
+    ;;
+
+  *)
+    echo "Usage: cbot [status|restart|stop|logs|tail|app|tui]"
+    ;;
 esac
