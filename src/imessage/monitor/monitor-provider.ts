@@ -112,6 +112,7 @@ export async function monitorIMessageProvider(opts: MonitorIMessageOpts = {}): P
   const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
   const groupPolicy = imessageCfg.groupPolicy ?? defaultGroupPolicy ?? "open";
   const dmPolicy = imessageCfg.dmPolicy ?? "pairing";
+  const readOnly = imessageCfg.readOnly ?? false;
   const includeAttachments = opts.includeAttachments ?? imessageCfg.includeAttachments ?? false;
   const mediaMaxBytes = (opts.mediaMaxMb ?? imessageCfg.mediaMaxMb ?? 16) * 1024 * 1024;
   const cliPath = opts.cliPath ?? imessageCfg.cliPath ?? "imsg";
@@ -505,6 +506,11 @@ export async function monitorIMessageProvider(opts: MonitorIMessageOpts = {}): P
       responsePrefixContextProvider: () => prefixContext,
       humanDelay: resolveHumanDelayConfig(cfg, route.agentId),
       deliver: async (payload) => {
+        // readOnly mode: agent sees messages but does NOT auto-reply
+        if (readOnly) {
+          logVerbose(`imessage: readOnly mode, skipping delivery`);
+          return;
+        }
         await deliverReplies({
           replies: [payload],
           target: ctxPayload.To,

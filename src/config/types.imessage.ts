@@ -10,6 +10,24 @@ export type IMessageAccountConfig = {
   configWrites?: boolean;
   /** If false, do not start this iMessage account. Default: true. */
   enabled?: boolean;
+  /**
+   * Read-only mode: agent sees messages but does NOT auto-reply.
+   * Useful for monitoring/categorizing messages without responding.
+   * Default: false.
+   */
+  readOnly?: boolean;
+  /**
+   * Outbound allowlist: restricts who the agent can send messages TO.
+   * If set, any send attempt to a recipient not on this list is blocked.
+   * This is a hard code-level restriction, not just agent guidance.
+   */
+  allowSendTo?: Array<string>;
+  /**
+   * Prefix to prepend to all outbound messages.
+   * Useful for making it clear the message is from the AI agent.
+   * Example: "🐿️ Chip:"
+   */
+  messagePrefix?: string;
   /** imsg CLI binary path (default: imsg). */
   cliPath?: string;
   /** Optional Messages db path override. */

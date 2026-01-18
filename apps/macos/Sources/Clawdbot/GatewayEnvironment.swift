@@ -25,14 +25,10 @@ struct Semver: Comparable, CustomStringConvertible, Sendable {
               let major = Int(parts[0]),
               let minor = Int(parts[1])
         else { return nil }
-        // Strip prerelease suffix (e.g., "11-4" → "11", "5-beta.1" → "5")
-        let patchRaw = String(parts[2])
-        guard let patchToken = patchRaw.split(whereSeparator: { $0 == "-" || $0 == "+" }).first,
-              let patchNumeric = Int(patchToken)
-        else {
-            return nil
-        }
-        return Semver(major: major, minor: minor, patch: patchNumeric)
+        // Strip pre-release suffix (e.g., "11-3" → "11") before parsing patch
+        let patchPart = String(parts[2]).split(separator: "-").first.map(String.init) ?? String(parts[2])
+        let patch = Int(patchPart) ?? 0
+        return Semver(major: major, minor: minor, patch: patch)
     }
 
     func compatible(with required: Semver) -> Bool {
@@ -84,13 +80,8 @@ enum GatewayEnvironment {
     }
 
     static func expectedGatewayVersion() -> Semver? {
-        Semver.parse(self.expectedGatewayVersionString())
-    }
-
-    static func expectedGatewayVersionString() -> String? {
         let bundleVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        let trimmed = bundleVersion?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (trimmed?.isEmpty == false) ? trimmed : nil
+        return Semver.parse(bundleVersion)
     }
 
     // Exposed for tests so we can inject fake version checks without rewriting bundle metadata.
@@ -109,7 +100,6 @@ enum GatewayEnvironment {
             }
         }
         let expected = self.expectedGatewayVersion()
-        let expectedString = self.expectedGatewayVersionString()
 
         let projectRoot = CommandResolver.projectRoot()
         let projectEntrypoint = CommandResolver.gatewayEntrypoint(in: projectRoot)
@@ -120,8 +110,8 @@ enum GatewayEnvironment {
                 kind: .missingNode,
                 nodeVersion: nil,
                 gatewayVersion: nil,
-                    requiredGateway: expectedString,
-                    message: RuntimeLocator.describeFailure(err))
+                requiredGateway: expected?.description,
+                message: RuntimeLocator.describeFailure(err))
         case let .success(runtime):
             let gatewayBin = CommandResolver.clawdbotExecutable()
 
@@ -130,7 +120,7 @@ enum GatewayEnvironment {
                     kind: .missingGateway,
                     nodeVersion: runtime.version.description,
                     gatewayVersion: nil,
-                    requiredGateway: expectedString,
+                    requiredGateway: expected?.description,
                     message: "clawdbot CLI not found in PATH; install the CLI.")
             }
 
@@ -138,14 +128,13 @@ enum GatewayEnvironment {
                 ?? self.readLocalGatewayVersion(projectRoot: projectRoot)
 
             if let expected, let installed, !installed.compatible(with: expected) {
-                let expectedText = expectedString ?? expected.description
                 return GatewayEnvironmentStatus(
-                    kind: .incompatible(found: installed.description, required: expectedText),
+                    kind: .incompatible(found: installed.description, required: expected.description),
                     nodeVersion: runtime.version.description,
                     gatewayVersion: installed.description,
-                    requiredGateway: expectedText,
+                    requiredGateway: expected.description,
                     message: """
-                    Gateway version \(installed.description) is incompatible with app \(expectedText);
+                    Gateway version \(installed.description) is incompatible with app \(expected.description);
                     install or update the global package.
                     """)
             }
@@ -163,7 +152,7 @@ enum GatewayEnvironment {
                 kind: .ok,
                 nodeVersion: runtime.version.description,
                 gatewayVersion: gatewayVersionText,
-                requiredGateway: expectedString,
+                requiredGateway: expected?.description,
                 message: "Node \(runtime.version.description); gateway \(gatewayVersionText) \(gatewayLabelText)")
         }
     }
@@ -231,18 +220,8 @@ enum GatewayEnvironment {
     }
 
     static func installGlobal(version: Semver?, statusHandler: @escaping @Sendable (String) -> Void) async {
-        await self.installGlobal(versionString: version?.description, statusHandler: statusHandler)
-    }
-
-    static func installGlobal(versionString: String?, statusHandler: @escaping @Sendable (String) -> Void) async {
         let preferred = CommandResolver.preferredPaths().joined(separator: ":")
-        let trimmed = versionString?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let target: String
-        if let trimmed, !trimmed.isEmpty {
-            target = trimmed
-        } else {
-            target = "latest"
-        }
+        let target = version?.description ?? "latest"
         let npm = CommandResolver.findExecutable(named: "npm")
         let pnpm = CommandResolver.findExecutable(named: "pnpm")
         let bun = CommandResolver.findExecutable(named: "bun")
@@ -301,7 +280,8 @@ enum GatewayEnvironment {
         process.standardOutput = pipe
         process.standardError = pipe
         do {
-            let data = try process.runAndReadToEnd(from: pipe)
+            try process.run()
+            process.waitUntilExit()
             let elapsedMs = Int(Date().timeIntervalSince(start) * 1000)
             if elapsedMs > 500 {
                 self.logger.warning(
@@ -316,6 +296,7 @@ enum GatewayEnvironment {
                     bin=\(binary, privacy: .public)
                     """)
             }
+            let data = pipe.fileHandleForReading.readToEndSafely()
             let raw = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return Semver.parse(raw)

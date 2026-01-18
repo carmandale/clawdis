@@ -47,9 +47,39 @@ export async function sendMessageIMessage(
     cfg,
     accountId: opts.accountId,
   });
+
+  // Enforce outbound allowlist if configured
+  const allowSendTo = account.config.allowSendTo;
+  if (allowSendTo && allowSendTo.length > 0) {
+    // Block chatId-based sends when allowSendTo is configured (can't verify recipient)
+    if (opts.chatId) {
+      throw new Error(
+        `iMessage send blocked: chatId-based sends not allowed when allowSendTo is configured. ` +
+          `Use explicit recipient address instead.`,
+      );
+    }
+    const normalizedTo = to.replace(/[\s\-()]/g, "").toLowerCase();
+    const normalizedAllowList = allowSendTo.map((entry) =>
+      entry.replace(/[\s\-()]/g, "").toLowerCase(),
+    );
+    const isAllowed = normalizedAllowList.some(
+      (allowed) => normalizedTo.includes(allowed) || allowed.includes(normalizedTo),
+    );
+    if (!isAllowed) {
+      throw new Error(
+        `iMessage send blocked: "${to}" is not in allowSendTo list. ` +
+          `Only these recipients are allowed: ${allowSendTo.join(", ")}`,
+      );
+    }
+  }
+
   const cliPath = opts.cliPath?.trim() || account.config.cliPath?.trim() || "imsg";
   const dbPath = opts.dbPath?.trim() || account.config.dbPath?.trim();
   const target = parseIMessageTarget(opts.chatId ? formatIMessageChatTarget(opts.chatId) : to);
+
+  // Apply message prefix if configured (e.g., "🐿️ Chip:")
+  const messagePrefix = account.config.messagePrefix;
+  const prefixedText = messagePrefix ? `${messagePrefix} ${text}` : text;
   const service =
     opts.service ??
     (target.kind === "handle" ? target.service : undefined) ??
@@ -61,7 +91,7 @@ export async function sendMessageIMessage(
       : typeof account.config.mediaMaxMb === "number"
         ? account.config.mediaMaxMb * 1024 * 1024
         : 16 * 1024 * 1024;
-  let message = text ?? "";
+  let message = prefixedText ?? "";
   let filePath: string | undefined;
 
   if (opts.mediaUrl?.trim()) {
