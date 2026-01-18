@@ -1,0 +1,13 @@
+{
+  "name": "@chip/promise-guard",
+  "version": "1.0.0",
+  "description": "Detect promises in outbound messages and auto-schedule follow-up crons",
+  "type": "module",
+  "main": "src/index.ts",
+  "clawdbot": {
+    "plugin": true,
+    "emoji": "⚠️"
+  },
+  "keywords": ["clawdbot", "plugin", "promises", "follow-through"],
+  "author": "Chip"
+}
