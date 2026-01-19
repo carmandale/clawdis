@@ -43,8 +43,6 @@ const GOOGLE_SCHEMA_UNSUPPORTED_KEYWORDS = new Set([
 const OPENAI_TOOL_CALL_ID_APIS = new Set([
   "openai",
   "openai-completions",
-  "openai-responses",
-  "openai-codex-responses",
 ]);
 
 function shouldSanitizeToolCallIds(modelApi?: string | null): boolean {

@@ -55,7 +55,7 @@ enum CLIInstaller {
             return
         }
 
-        let detail = response.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = response.stderr.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         let fallback = response.errorMessage ?? "install failed"
         await statusHandler("Install failed: \(detail.isEmpty ? fallback : detail)")
     }

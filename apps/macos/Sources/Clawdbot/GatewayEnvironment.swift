@@ -84,6 +84,10 @@ enum GatewayEnvironment {
         return Semver.parse(bundleVersion)
     }
 
+    static func expectedGatewayVersionString() -> String? {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    }
+
     // Exposed for tests so we can inject fake version checks without rewriting bundle metadata.
     static func expectedGatewayVersion(from versionString: String?) -> Semver? {
         Semver.parse(versionString)

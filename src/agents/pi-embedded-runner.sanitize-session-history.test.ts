@@ -107,4 +107,46 @@ describe("sanitizeSessionHistory", () => {
     expect(helpers.isGoogleModelApi).toHaveBeenCalledWith("google-gemini");
     expect(helpers.downgradeGeminiHistory).toHaveBeenCalled();
   });
+
+  it("does not sanitize tool call ids for OpenAI responses", async () => {
+    vi.mocked(helpers.isGoogleModelApi).mockReturnValue(false);
+
+    const result = await sanitizeSessionHistory({
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "call_123|fc_456",
+              name: "read",
+              arguments: {},
+            },
+          ],
+        },
+        {
+          role: "toolResult",
+          toolCallId: "call_123|fc_456",
+          toolName: "read",
+          content: [{ type: "text", text: "ok" }],
+          isError: false,
+        },
+      ],
+      modelApi: "openai-responses",
+      provider: "openai",
+      sessionManager: mockSessionManager,
+      sessionId: "test-session",
+    });
+
+    const assistant = result[0] as unknown as { role?: string; content?: unknown };
+    expect(assistant.role).toBe("assistant");
+    const toolCall = (assistant.content as Array<{ type?: string; id?: string }>).find(
+      (b) => b.type === "toolCall",
+    );
+    expect(toolCall?.id).toBe("call_123|fc_456");
+
+    const toolResult = result[1] as unknown as { role?: string; toolCallId?: string };
+    expect(toolResult.role).toBe("toolResult");
+    expect(toolResult.toolCallId).toBe("call_123|fc_456");
+  });
 });
