@@ -1,0 +1,72 @@
+---
+schema_version: "1.0.0"
+mode: handoff
+date: 2026-02-03T10:45:37.734Z
+session: "clawdbot-drr-dual-gateway-node-implementation"
+outcome: "PARTIAL_PLUS"
+primary_bead: "clawdbot-drr"
+---
+
+goal: "Implement dual-gateway architecture: Mac gateway for TUI + Mac as node to Railway + qmd cross-gateway search"
+now: "Dual-gateway + node architecture fully implemented and validated:
+- Mac gateway running (pid 62768, port 18789) with all messaging channels disabled
+- Mac node host running (pid 62999), connected to Railway, paired
+- Railway gateway running with Telegram/Discord/Slack enabled
+- Slack pairing approved for user U2YFMSK3N
+- Core personality files confirmed synced (identical hashes)
+- qmd indexing 1027 files across both gateways (BM25 search works)
+- Workspace hooks discovered but failing to load (ESM module issue identified)"
+
+done_this_session:
+  - "Investigated qmd integration - confirmed collections correctly configured"
+  - "Discovered session.store only moves INDEX, not transcripts (transcripts always in ~/.openclaw/agents/)"
+  - "Validated dual-gateway + node architecture is supported (node is WS client, no port conflicts)"
+  - "Disabled Discord channel on Mac (was enabled, now disabled to avoid Railway conflict)"
+  - "Installed and started Mac gateway service (LaunchAgent ai.openclaw.gateway)"
+  - "Verified Mac node host connected to Railway (paired, connected)"
+  - "Configured Slack on Railway and approved user pairing"
+  - "Synced Mac with Railway (was 1 commit behind)"
+  - "Verified all core personality files identical (CHIP.md, SOUL.md, memory.md, etc.)"
+  - "Enabled workspace hooks (Gateway Sync, Catch-Up Inject) in config"
+  - "Discovered hooks failing to load due to ESM module issue"
+
+next:
+  - "Fix hook ESM module issue: add package.json with type:module to ~/chipbot/hooks/"
+  - "Restart gateway and verify hooks load (check for 'Registered hook: Gateway Sync')"
+  - "Test hooks: restart gateway to trigger gateway:startup, then start TUI for agent:bootstrap"
+  - "Complete qmd embeddings: nohup qmd embed > /tmp/qmd-embed.log 2>&1 &"
+  - "Set up qmd auto-update cron: 0 5 * * * qmd update && qmd embed"
+  - "Set up git sync push cron for sessions"
+
+blockers:
+  - "Workspace hooks not loading - ESM module resolution error"
+
+findings:
+  - "session.store config only moves sessions.json INDEX, transcripts always go to ~/.openclaw/agents/"
+  - "Mac can run gateway AND node simultaneously (no port conflicts, separate configs)"
+  - "Node host uses node.json, gateway uses openclaw.json (separate files)"
+  - "Hooks show as 'ready' in openclaw hooks list but fail to load at runtime"
+  - "Error: 'Cannot use import statement outside a module' for all workspace hooks"
+
+worked:
+  - "openclaw gateway install/start - clean LaunchAgent installation"
+  - "openclaw config set channels.discord.enabled false"
+  - "openclaw hooks enable 'Gateway Sync'"
+  - "railway ssh to run commands on Railway deployment"
+  - "Personality file sync via git (all hashes match)"
+
+failed:
+  - "Workspace hooks loading - ESM module issue needs package.json fix"
+
+files:
+  - "~/.openclaw/openclaw.json - Mac gateway config (channels disabled)"
+  - "~/.openclaw/node.json - Mac node config (Railway connection)"
+  - "~/chipbot/hooks/*/handler.ts - Workspace hooks (need ESM fix)"
+  - "~/chipbot/hooks/*/HOOK.md - Hook metadata (correctly configured)"
+  - "thoughts/shared/investigations/2026-02-02_dual-gateway-qmd-integration.md"
+  - "thoughts/shared/investigations/2026-02-03_dual-gateway-node-architecture.md"
+
+git:
+  branch: "main"
+  commit: "6f7f04d35ee83ce2582b442e799f602b70da20ae"
+  remote: "https://github.com/carmandale/clawdis.git"
