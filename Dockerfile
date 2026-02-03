@@ -8,6 +8,12 @@ RUN corepack enable
 
 WORKDIR /app
 
+# Install git (required for Railway preDeployCommand and workspace sync)
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 ARG OPENCLAW_DOCKER_APT_PACKAGES=""
 RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then \
       apt-get update && \
@@ -37,7 +43,11 @@ RUN chown -R node:node /app
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
-USER node
+#
+# NOTE: Disabled for Railway deployment - Railway volumes are mounted as root
+# and preDeployCommand needs write access to /data. For other deployment targets,
+# uncomment the USER directive below.
+# USER node
 
 # Start gateway server with default config.
 # Binds to loopback (127.0.0.1) by default for security.
