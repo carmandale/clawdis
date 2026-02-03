@@ -52,6 +52,16 @@ node -e "
   if (!config.gateway.controlUi) config.gateway.controlUi = {};
   config.gateway.controlUi.enabled = true;
   
+  // Set gateway auth token from env var (required for node connections)
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (gatewayToken) {
+    if (!config.gateway.auth) config.gateway.auth = {};
+    config.gateway.auth.token = gatewayToken;
+    console.log('Gateway auth token configured from OPENCLAW_GATEWAY_TOKEN');
+  } else {
+    console.log('WARNING: OPENCLAW_GATEWAY_TOKEN not set - node connections will fail');
+  }
+  
   // Agents configuration
   if (!config.agents) {
     config.agents = { defaults: {}, list: [] };
