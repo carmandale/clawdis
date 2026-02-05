@@ -69,10 +69,15 @@ node -e "
   // CRITICAL: Bind to 0.0.0.0 for external access
   config.gateway.bind = 'lan';
   
-  // SECURITY: trustedProxies - leave empty because CIDR is not supported
-  // The code only does exact IP matching, so '100.64.0.0/10' would never match
-  // If you need trusted proxy support, add exact IPs here
-  config.gateway.trustedProxies = [];
+  // trustedProxies - Railway's internal proxy IPs (100.64.0.x range)
+  // CIDR is not supported, so we list individual IPs
+  // This enables proper client IP detection and local-like treatment
+  config.gateway.trustedProxies = [
+    '100.64.0.1', '100.64.0.2', '100.64.0.3', '100.64.0.4',
+    '100.64.0.5', '100.64.0.6', '100.64.0.7', '100.64.0.8',
+    '100.64.0.9', '100.64.0.10', '100.64.0.11', '100.64.0.12',
+    '100.64.0.13', '100.64.0.14', '100.64.0.15', '100.64.0.16'
+  ];
   
   // Enable Control UI for webchat
   if (!config.gateway.controlUi) config.gateway.controlUi = {};
@@ -171,7 +176,7 @@ node -e "
   console.log('=== Railway Security Configuration ===');
   console.log('Gateway:');
   console.log('  - bind: ' + config.gateway.bind + ' (0.0.0.0)');
-  console.log('  - trustedProxies: [] (CIDR not supported)');
+  console.log('  - trustedProxies: ' + config.gateway.trustedProxies.length + ' Railway proxy IPs');
   console.log('  - auth.token: (from env, not in config)');
   console.log('Tools:');
   console.log('  - elevated.enabled: false');
