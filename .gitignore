@@ -71,3 +71,7 @@ USER.md
 # local tooling
 .serena/
 .claude/
+
+# Workspace content lives in chipbot, not here
+thoughts/
+.env.local
