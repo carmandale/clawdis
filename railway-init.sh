@@ -29,6 +29,8 @@ fi
 # Ensure directories exist (Railway volume may be empty on first deploy)
 mkdir -p /data/.clawdbot/workspace
 mkdir -p /data/.clawdbot/sessions
+# Create ephemeral session directory for stability (fast I/O)
+mkdir -p /tmp/openclaw-sessions
 
 CONFIG_FILE="/data/.clawdbot/openclaw.json"
 
