@@ -66,6 +66,9 @@ apps/ios/*.mobileprovision
 .vscode/
 IDENTITY.md
 USER.md
+# But keep the app templates (needed for Railway deployment)
+!docs/reference/templates/IDENTITY.md
+!docs/reference/templates/USER.md
 .tgz
 
 # local tooling
