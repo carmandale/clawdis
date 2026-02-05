@@ -8,6 +8,11 @@
 
 set -e
 
+# CRITICAL: Set state/config paths BEFORE any OpenClaw commands
+# This ensures the gateway reads config from the persistent volume
+export OPENCLAW_STATE_DIR="/data/.clawdbot"
+export OPENCLAW_CONFIG_PATH="/data/.clawdbot/openclaw.json"
+
 # Ensure directories exist (Railway volume may be empty on first deploy)
 mkdir -p /data/.clawdbot/workspace
 
