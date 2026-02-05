@@ -183,13 +183,15 @@ node -e "
     console.log('WARNING: OPENCLAW_DISCORD_TOKEN not set - Discord disabled');
   }
 
-  // Slack configuration - add owner to allowlist
+  // Slack configuration - add owner to allowlist (uses dm.* like Discord)
   if (config.channels?.slack?.enabled) {
-    config.channels.slack.dmPolicy = 'pairing';
-    config.channels.slack.allowFrom = [OWNER_SLACK_ID];
+    config.channels.slack.dm = config.channels.slack.dm || {};
+    config.channels.slack.dm.enabled = true;
+    config.channels.slack.dm.policy = 'pairing';
+    config.channels.slack.dm.allowFrom = [OWNER_SLACK_ID];
     config.channels.slack.groupPolicy = 'disabled';  // No group access on Railway
     
-    console.log('Slack: dmPolicy=pairing, allowFrom=[' + OWNER_SLACK_ID + ']');
+    console.log('Slack: dm.policy=pairing, dm.allowFrom=[' + OWNER_SLACK_ID + ']');
   }
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -207,7 +209,7 @@ node -e "
   console.log('Channels:');
   console.log('  - telegram.dmPolicy: ' + (config.channels.telegram?.dmPolicy || 'n/a'));
   console.log('  - discord.dm.policy: ' + (config.channels.discord?.dm?.policy || 'n/a'));
-  console.log('  - slack.dmPolicy: ' + (config.channels.slack?.dmPolicy || 'n/a'));
+  console.log('  - slack.dm.policy: ' + (config.channels.slack?.dm?.policy || 'n/a'));
 "
 
 # Run doctor after config is set up (use absolute path - WORKDIR is /app)
