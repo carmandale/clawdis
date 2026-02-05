@@ -30,7 +30,8 @@ fi
 mkdir -p /data/.clawdbot/workspace
 mkdir -p /data/.clawdbot/sessions
 # Create ephemeral session directory for stability (fast I/O)
-mkdir -p /tmp/openclaw-sessions
+# Must include agent subdirectory (main) since store path is {agentId}/sessions.json
+mkdir -p /tmp/openclaw-sessions/main
 
 CONFIG_FILE="/data/.clawdbot/openclaw.json"
 
