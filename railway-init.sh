@@ -100,9 +100,12 @@ node -e "
   config.agents.defaults = config.agents.defaults || {};
   config.agents.defaults.workspace = '/data/.clawdbot/workspace/chipbot';
   
-  // SECURITY: Store sessions OUTSIDE git workspace to prevent accidental exposure
+  // STABILITY: Store sessions on fast ephemeral disk to avoid event loop blocking
+  // Railway persistent volumes have higher I/O latency which can cause Discord
+  // gateway to miss heartbeats and enter reconnection loops.
+  // Trade-off: Sessions reset on deploy (acceptable for stability)
   if (!config.session) config.session = {};
-  config.session.store = '/data/.clawdbot/sessions/{agentId}/sessions.json';
+  config.session.store = '/tmp/openclaw-sessions/{agentId}/sessions.json';
   config.session.dmScope = 'per-channel-peer';
   
   // SECURITY: Disable elevated tools by default on Railway
@@ -166,7 +169,13 @@ node -e "
     // SECURITY: Disable guild/group access on Railway
     config.channels.discord.groupPolicy = 'disabled';
     
-    console.log('Discord: dm.policy=pairing, dm.allowFrom=[' + OWNER_DISCORD_ID + ']');
+    // STABILITY: Disable native commands to reduce startup work and API calls
+    config.channels.discord.commands = { native: false, nativeSkills: false };
+    
+    // STABILITY: Minimal intents to reduce event volume and memory usage
+    config.channels.discord.intents = { presence: false, guildMembers: false };
+    
+    console.log('Discord: dm.policy=pairing, dm.allowFrom=[' + OWNER_DISCORD_ID + '], commands=disabled');
   } else {
     console.log('WARNING: OPENCLAW_DISCORD_TOKEN not set - Discord disabled');
   }
@@ -182,7 +191,7 @@ node -e "
   console.log('  - elevated.enabled: false');
   console.log('  - deny: ' + JSON.stringify(config.tools.deny));
   console.log('Sessions:');
-  console.log('  - store: ' + config.session.store + ' (outside git)');
+  console.log('  - store: ' + config.session.store + ' (ephemeral /tmp for stability)');
   console.log('Channels:');
   console.log('  - telegram.dmPolicy: ' + (config.channels.telegram?.dmPolicy || 'n/a'));
   console.log('  - discord.dm.policy: ' + (config.channels.discord?.dm?.policy || 'n/a'));
