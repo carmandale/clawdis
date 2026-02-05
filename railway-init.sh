@@ -60,8 +60,8 @@ node -e "
   // ============================================
   // OWNER IDS - Update these if you change accounts
   // ============================================
-  const OWNER_TELEGRAM_ID = '6980882002';
-  const OWNER_DISCORD_ID = '244850829801029632';
+  const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID || '6980882002';
+  const OWNER_DISCORD_ID = process.env.OWNER_DISCORD_ID || '244850829801029632';
 
   // Gateway configuration
   if (!config.gateway) config.gateway = {};
