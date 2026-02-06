@@ -63,7 +63,6 @@ apps/ios/*.mobileprovision
 
 # Local untracked files
 .local/
-.vscode/
 IDENTITY.md
 USER.md
 # But keep the app templates (needed for Railway deployment)
@@ -78,3 +77,8 @@ USER.md
 # Workspace content lives in chipbot, not here
 thoughts/
 .env.local
+
+# Agent credentials and memory (NEVER COMMIT)
+memory/
+.agent/*.json
+!.agent/workflows/
