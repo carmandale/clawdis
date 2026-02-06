@@ -126,8 +126,11 @@ echo ""
 echo "[railway-init] Running doctor..."
 node /app/dist/index.js doctor --fix || true
 
-echo "[railway-init] Starting gateway..."
+# Debug: show PORT value
+echo "[railway-init] PORT env var: '${PORT}'"
+GATEWAY_PORT="${PORT:-18789}"
+echo "[railway-init] Starting gateway on port ${GATEWAY_PORT}..."
 exec node /app/dist/index.js gateway run \
   --allow-unconfigured \
-  --port "${PORT:-18789}" \
+  --port "${GATEWAY_PORT}" \
   --bind lan
