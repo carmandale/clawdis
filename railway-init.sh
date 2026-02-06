@@ -1,225 +1,132 @@
 #!/bin/sh
 # Railway init script - configure Chip agent for Railway deployment
-# 
-# Architecture (from openclaw-flow.png):
-# - Local Mac: TUI via Ghostty
-# - Railway: Telegram (iPhone), Discord (iPad), Webchat
-# - Both share chipbot workspace via git sync
 #
-# SECURITY HARDENING (2026-02-04):
-# - DM policy: pairing (not open) - requires approval before commands work
-# - Allowlists: specific user IDs only (not ["*"])
-# - Gateway token: read from env only, not written to config
-# - Sessions: stored outside git workspace to prevent accidental exposure
-# - Elevated tools: disabled by default
+# Architecture:
+# - Uses declarative config from chipbot/config/railway.json5
+# - No runtime JSON patching - config changes are version-controlled
+# - Bot tokens come from env vars, not config file
+#
+# Required env vars:
+# - OPENCLAW_GATEWAY_TOKEN: Auth token for internet-facing gateway
+# - TELEGRAM_BOT_TOKEN (or OPENCLAW_TELEGRAM_BOT_TOKEN): Telegram bot token
+# - DISCORD_BOT_TOKEN (or OPENCLAW_DISCORD_TOKEN): Discord bot token
+# - SLACK_BOT_TOKEN + SLACK_APP_TOKEN: Slack tokens (if using Slack)
 
 set -e
 
-# CRITICAL: Set state/config paths BEFORE any OpenClaw commands
-# This ensures the gateway reads config from the persistent volume
-export OPENCLAW_STATE_DIR="/data/.clawdbot"
-export OPENCLAW_CONFIG_PATH="/data/.clawdbot/openclaw.json"
+echo "[railway-init] Starting Railway gateway initialization..."
 
-# SECURITY: Require gateway token for internet-facing deployment
-if [ -z "$OPENCLAW_GATEWAY_TOKEN" ]; then
-  echo "ERROR: OPENCLAW_GATEWAY_TOKEN not set - refusing to start internet-facing gateway without auth"
-  exit 1
-fi
+# ============================================
+# STATE DIRECTORY SETUP
+# ============================================
+
+export OPENCLAW_STATE_DIR="/data/.clawdbot"
 
 # Ensure directories exist (Railway volume may be empty on first deploy)
 mkdir -p /data/.clawdbot/workspace
 mkdir -p /data/.clawdbot/sessions
+
 # Create ephemeral session directory for stability (fast I/O)
-# Must include agent subdirectory (main) since store path is {agentId}/sessions.json
+# Must include agent subdirectory since store path is {agentId}/sessions.json
 mkdir -p /tmp/openclaw-sessions/main
 
-CONFIG_FILE="/data/.clawdbot/openclaw.json"
+echo "[railway-init] State directories created"
 
-# Clone workspace if not present, or pull updates
-if [ -d "/data/.clawdbot/workspace/chipbot/.git" ]; then
-  echo "Pulling latest workspace changes..."
-  (cd /data/.clawdbot/workspace/chipbot && git pull --ff-only) || true
+# ============================================
+# SECURITY: REQUIRE GATEWAY TOKEN
+# ============================================
+
+if [ -z "$OPENCLAW_GATEWAY_TOKEN" ]; then
+  echo "ERROR: OPENCLAW_GATEWAY_TOKEN not set"
+  echo "Refusing to start internet-facing gateway without auth"
+  exit 1
+fi
+
+# ============================================
+# LEGACY ENV VAR MAPPING
+# ============================================
+# Map legacy OPENCLAW_* token vars to canonical names for backward compatibility
+# This allows gradual migration of Railway environment variables
+
+if [ -z "$TELEGRAM_BOT_TOKEN" ] && [ -n "$OPENCLAW_TELEGRAM_BOT_TOKEN" ]; then
+  export TELEGRAM_BOT_TOKEN="$OPENCLAW_TELEGRAM_BOT_TOKEN"
+  echo "[railway-init] Mapped OPENCLAW_TELEGRAM_BOT_TOKEN -> TELEGRAM_BOT_TOKEN"
+fi
+
+if [ -z "$DISCORD_BOT_TOKEN" ] && [ -n "$OPENCLAW_DISCORD_TOKEN" ]; then
+  export DISCORD_BOT_TOKEN="$OPENCLAW_DISCORD_TOKEN"
+  echo "[railway-init] Mapped OPENCLAW_DISCORD_TOKEN -> DISCORD_BOT_TOKEN"
+fi
+
+# ============================================
+# CLONE/PULL WORKSPACE
+# ============================================
+
+WORKSPACE_DIR="/data/.clawdbot/workspace/chipbot"
+
+if [ -d "$WORKSPACE_DIR/.git" ]; then
+  echo "[railway-init] Pulling latest workspace changes..."
+  (cd "$WORKSPACE_DIR" && git pull --ff-only) || {
+    echo "[railway-init] WARNING: git pull failed, continuing with existing workspace"
+  }
 else
-  echo "Cloning workspace..."
-  mkdir -p /data/.clawdbot/workspace
-  git clone https://github.com/carmandale/chipbot.git /data/.clawdbot/workspace/chipbot || {
-    echo "WARNING: Failed to clone workspace, continuing anyway"
+  echo "[railway-init] Cloning workspace..."
+  git clone https://github.com/carmandale/chipbot.git "$WORKSPACE_DIR" || {
+    echo "ERROR: Failed to clone workspace"
+    exit 1
   }
 fi
 
-# Configure the gateway for Railway BEFORE running doctor
-echo "Configuring Railway gateway settings..."
-node -e "
-  const fs = require('fs');
-  const configPath = '$CONFIG_FILE';
-  
-  let config = {};
-  try {
-    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  } catch (e) {
-    console.log('Creating new config file');
-  }
+echo "[railway-init] Workspace ready at $WORKSPACE_DIR"
 
-  // ============================================
-  // OWNER IDS - Update these if you change accounts
-  // ============================================
-  const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID || '6980882002';
-  const OWNER_DISCORD_ID = process.env.OWNER_DISCORD_ID || '244850829801029632';
-  const OWNER_SLACK_ID = process.env.OWNER_SLACK_ID || 'U2YFMSK3N';
+# ============================================
+# DECLARATIVE CONFIG SETUP
+# ============================================
+# Copy config from git workspace to state dir to keep workspace clean
+# (doctor --fix may write backups; this avoids git-dirty issues)
 
-  // Gateway configuration
-  if (!config.gateway) config.gateway = {};
-  
-  // CRITICAL: Bind to 0.0.0.0 for external access
-  config.gateway.bind = 'lan';
-  
-  // trustedProxies - Railway's internal proxy IPs (100.64.0.x range)
-  // CIDR is not supported, so we list individual IPs
-  // This enables proper client IP detection and local-like treatment
-  config.gateway.trustedProxies = [
-    '100.64.0.1', '100.64.0.2', '100.64.0.3', '100.64.0.4',
-    '100.64.0.5', '100.64.0.6', '100.64.0.7', '100.64.0.8',
-    '100.64.0.9', '100.64.0.10', '100.64.0.11', '100.64.0.12',
-    '100.64.0.13', '100.64.0.14', '100.64.0.15', '100.64.0.16'
-  ];
-  
-  // Enable Control UI for webchat
-  if (!config.gateway.controlUi) config.gateway.controlUi = {};
-  config.gateway.controlUi.enabled = true;
-  
-  // SECURITY: Do NOT write gateway token to config file
-  // The gateway reads OPENCLAW_GATEWAY_TOKEN from environment directly
-  // This prevents token exposure if config file is accidentally leaked
-  if (config.gateway.auth?.token) {
-    delete config.gateway.auth.token;
-    console.log('Removed gateway token from config (using env var instead)');
-  }
-  
-  // Agents configuration
-  if (!config.agents) {
-    config.agents = { defaults: {}, list: [] };
-  }
-  
-  // Set workspace
-  config.agents.defaults = config.agents.defaults || {};
-  config.agents.defaults.workspace = '/data/.clawdbot/workspace/chipbot';
-  
-  // STABILITY: Store sessions on fast ephemeral disk to avoid event loop blocking
-  // Railway persistent volumes have higher I/O latency which can cause Discord
-  // gateway to miss heartbeats and enter reconnection loops.
-  // Trade-off: Sessions reset on deploy (acceptable for stability)
-  if (!config.session) config.session = {};
-  config.session.store = '/tmp/openclaw-sessions/{agentId}/sessions.json';
-  config.session.dmScope = 'per-channel-peer';
-  
-  // SECURITY: Disable elevated tools by default on Railway
-  if (!config.tools) config.tools = {};
-  config.tools.elevated = { enabled: false };
-  // Deny high-risk tool groups
-  config.tools.deny = config.tools.deny || [];
-  if (!config.tools.deny.includes('group:web')) {
-    config.tools.deny.push('group:web');
-  }
-  
-  // Add Chip agent if not present
-  if (!config.agents.list) config.agents.list = [];
-  const hasChip = config.agents.list.some(a => a.id === 'main');
-  if (!hasChip) {
-    config.agents.list.push({
-      id: 'main',
-      identity: {
-        name: 'Chip',
-        emoji: '🐿️'
-      }
-    });
-  }
+CONFIG_SOURCE="$WORKSPACE_DIR/config/railway.json5"
+CONFIG_TARGET="/data/.clawdbot/openclaw.json5"
 
-  // Channels configuration - enable Telegram and Discord
-  if (!config.channels) config.channels = {};
-  
-  // Telegram configuration (token from OPENCLAW_TELEGRAM_BOT_TOKEN env var)
-  const telegramToken = process.env.OPENCLAW_TELEGRAM_BOT_TOKEN;
-  if (telegramToken) {
-    config.channels.telegram = config.channels.telegram || {};
-    config.channels.telegram.enabled = true;
-    config.channels.telegram.botToken = telegramToken;
-    
-    // SECURITY: Use pairing mode with specific allowlist
-    // - dmPolicy='pairing' requires approval before commands work
-    // - allowFrom contains only your Telegram user ID
-    config.channels.telegram.dmPolicy = 'pairing';
-    config.channels.telegram.allowFrom = [OWNER_TELEGRAM_ID];
-    config.channels.telegram.groupPolicy = 'disabled';  // No group access on Railway
-    
-    console.log('Telegram: dmPolicy=pairing, allowFrom=[' + OWNER_TELEGRAM_ID + ']');
-  } else {
-    console.log('WARNING: OPENCLAW_TELEGRAM_BOT_TOKEN not set - Telegram disabled');
-  }
-  
-  // Discord configuration (token from OPENCLAW_DISCORD_TOKEN env var)
-  const discordToken = process.env.OPENCLAW_DISCORD_TOKEN;
-  if (discordToken) {
-    config.channels.discord = config.channels.discord || {};
-    config.channels.discord.enabled = true;
-    config.channels.discord.token = discordToken;
-    delete config.channels.discord.botToken;  // Remove invalid key if present
-    
-    // SECURITY: Use pairing mode with specific allowlist
-    config.channels.discord.dm = config.channels.discord.dm || {};
-    config.channels.discord.dm.enabled = true;
-    config.channels.discord.dm.policy = 'pairing';
-    config.channels.discord.dm.allowFrom = [OWNER_DISCORD_ID];
-    
-    // SECURITY: Disable guild/group access on Railway
-    config.channels.discord.groupPolicy = 'disabled';
-    
-    // STABILITY: Disable native commands to reduce startup work and API calls
-    config.channels.discord.commands = { native: false, nativeSkills: false };
-    
-    // STABILITY: Minimal intents to reduce event volume and memory usage
-    config.channels.discord.intents = { presence: false, guildMembers: false };
-    
-    console.log('Discord: dm.policy=pairing, dm.allowFrom=[' + OWNER_DISCORD_ID + '], commands=disabled');
-  } else {
-    console.log('WARNING: OPENCLAW_DISCORD_TOKEN not set - Discord disabled');
-  }
+if [ ! -f "$CONFIG_SOURCE" ]; then
+  echo "ERROR: Declarative config not found at $CONFIG_SOURCE"
+  echo "Ensure chipbot/config/railway.json5 exists in the repository"
+  exit 1
+fi
 
-  // Slack configuration - add owner to allowlist (uses dm.* like Discord)
-  if (config.channels?.slack?.enabled) {
-    config.channels.slack.dm = config.channels.slack.dm || {};
-    config.channels.slack.dm.enabled = true;
-    config.channels.slack.dm.policy = 'pairing';
-    config.channels.slack.dm.allowFrom = [OWNER_SLACK_ID];
-    config.channels.slack.groupPolicy = 'disabled';  // No group access on Railway
-    
-    console.log('Slack: dm.policy=pairing, dm.allowFrom=[' + OWNER_SLACK_ID + ']');
-  }
+# Always copy fresh config from repo (ensures updates are applied on deploy)
+cp "$CONFIG_SOURCE" "$CONFIG_TARGET"
+echo "[railway-init] Copied config: $CONFIG_SOURCE -> $CONFIG_TARGET"
 
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  console.log('');
-  console.log('=== Railway Security Configuration ===');
-  console.log('Gateway:');
-  console.log('  - bind: ' + config.gateway.bind + ' (0.0.0.0)');
-  console.log('  - trustedProxies: ' + config.gateway.trustedProxies.length + ' Railway proxy IPs');
-  console.log('  - auth.token: (from env, not in config)');
-  console.log('Tools:');
-  console.log('  - elevated.enabled: false');
-  console.log('  - deny: ' + JSON.stringify(config.tools.deny));
-  console.log('Sessions:');
-  console.log('  - store: ' + config.session.store + ' (ephemeral /tmp for stability)');
-  console.log('Channels:');
-  console.log('  - telegram.dmPolicy: ' + (config.channels.telegram?.dmPolicy || 'n/a'));
-  console.log('  - discord.dm.policy: ' + (config.channels.discord?.dm?.policy || 'n/a'));
-  console.log('  - slack.dm.policy: ' + (config.channels.slack?.dm?.policy || 'n/a'));
-"
+export OPENCLAW_CONFIG_PATH="$CONFIG_TARGET"
 
-# Run doctor after config is set up (use absolute path - WORKDIR is /app)
-echo "Running doctor..."
+# ============================================
+# VERIFY CONFIGURATION
+# ============================================
+
+echo ""
+echo "=== Railway Configuration ==="
+echo "Config:    $OPENCLAW_CONFIG_PATH"
+echo "Workspace: $WORKSPACE_DIR"
+echo "State:     $OPENCLAW_STATE_DIR"
+echo ""
+echo "Channels:"
+[ -n "$TELEGRAM_BOT_TOKEN" ] && echo "  - Telegram: enabled (token set)"
+[ -z "$TELEGRAM_BOT_TOKEN" ] && echo "  - Telegram: disabled (no token)"
+[ -n "$DISCORD_BOT_TOKEN" ] && echo "  - Discord: enabled (token set)"
+[ -z "$DISCORD_BOT_TOKEN" ] && echo "  - Discord: disabled (no token)"
+[ -n "$SLACK_BOT_TOKEN" ] && echo "  - Slack: enabled (token set)"
+[ -z "$SLACK_BOT_TOKEN" ] && echo "  - Slack: disabled (no token)"
+echo ""
+
+# ============================================
+# DOCTOR & GATEWAY
+# ============================================
+
+echo "[railway-init] Running doctor..."
 node /app/dist/index.js doctor --fix || true
 
-# Start gateway with Railway-compatible settings
-# --bind lan resolves to 0.0.0.0 for external access
-# OPENCLAW_GATEWAY_TOKEN must be set for non-loopback binding
+echo "[railway-init] Starting gateway..."
 exec node /app/dist/index.js gateway run \
   --allow-unconfigured \
   --port "${PORT:-18789}" \
