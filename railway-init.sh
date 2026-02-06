@@ -13,6 +13,10 @@ set -e
 
 WORKSPACE_DIR="/data/.clawdbot/workspace/chipbot"
 WORKSPACE_REPO="https://github.com/carmandale/clawdbot-workspace.git"
+# Use GITHUB_TOKEN for private repo access if available
+if [ -n "$GITHUB_TOKEN" ]; then
+  WORKSPACE_REPO="https://${GITHUB_TOKEN}@github.com/carmandale/clawdbot-workspace.git"
+fi
 
 echo "[bootloader] Starting workspace bootstrap..."
 
@@ -20,7 +24,6 @@ mkdir -p /data/.clawdbot/workspace
 
 if [ -d "$WORKSPACE_DIR/.git" ]; then
   echo "[bootloader] Pulling latest workspace..."
-  # Ensure remote URL is correct (may have been stale from previous deploys)
   (cd "$WORKSPACE_DIR" && git remote set-url origin "$WORKSPACE_REPO" && git pull --ff-only) || {
     echo "[bootloader] WARNING: git pull failed, continuing with existing workspace"
   }
