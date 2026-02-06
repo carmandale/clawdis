@@ -33,6 +33,7 @@ import {
 } from "./hooks.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
+import { getHealthCache } from "./server/health-state.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
@@ -53,6 +54,25 @@ type HookDispatchers = {
     allowUnsafeExternalContent?: boolean;
   }) => string;
 };
+
+function handleHealthRequest(req: IncomingMessage, res: ServerResponse): boolean {
+  const url = req.url ?? "/";
+  if (
+    url !== "/health" &&
+    url !== "/healthz" &&
+    !url.startsWith("/health?") &&
+    !url.startsWith("/healthz?")
+  ) {
+    return false;
+  }
+  const cached = getHealthCache();
+  if (cached) {
+    sendJson(res, 200, { ok: true, ts: cached.ts });
+  } else {
+    sendJson(res, 503, { ok: false, ts: 0 });
+  }
+  return true;
+}
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
@@ -242,6 +262,11 @@ export function createGatewayHttpServer(opts: {
   async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // Don't interfere with WebSocket upgrades; ws handles the 'upgrade' event.
     if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") {
+      return;
+    }
+
+    // Unauthenticated health probe for Railway/Render zero-downtime deploys.
+    if (handleHealthRequest(req, res)) {
       return;
     }
 

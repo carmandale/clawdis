@@ -139,6 +139,12 @@
 - **After fresh clone:** run `scripts/setup-fork.sh` to configure the merge driver. Without this, `.gitattributes` `merge=ours` does nothing.
 - **Do NOT** add Railway customization (env var mapping, config copying, doctor handling, channel setup) to clawdbot. It all goes in `chipbot/railway-init.sh`.
 
+### Fork-Divergent Source Files (Pending Upstream PR)
+
+These are upstream source files we modified. They are NOT protected by `merge=ours` (and shouldn't be). They need manual attention after upstream merges.
+
+- **`src/gateway/server-http.ts`** — Added `GET /health` and `/healthz` HTTP endpoint (unauthenticated, returns `{ok, ts}`). This enables Railway zero-downtime deploys via `healthcheckPath` in `railway.toml`. Pending upstream PR to OpenClaw. **After upstream merge:** check that `handleHealthRequest()` is still the first handler in `handleRequest()`, before the try/catch block. If upstream added their own `/health`, remove ours and use theirs. If upstream restructured the handler chain, re-insert the health check as the first route.
+
 ## Agent-Specific Notes
 
 - Vocabulary: "makeup" = "mac app".
