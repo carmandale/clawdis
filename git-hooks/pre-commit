@@ -4,4 +4,31 @@ FILES=$(git diff --cached --name-only --diff-filter=ACMR | sed 's| |\\ |g')
 echo "$FILES" | xargs pnpm format:fix --no-error-on-unmatched-pattern
 echo "$FILES" | xargs git add
 
+# ============================================
+# FORK-LOCAL BOOTLOADER GUARD
+# ============================================
+# Prevent accidental overwrite of the railway-init.sh bootloader.
+# The bootloader should be ~40 lines max. If it's bigger, an agent
+# likely replaced it with a full init script (all logic belongs in chipbot).
+if echo "$FILES" | grep -q "railway-init.sh"; then
+  LINES=$(wc -l < railway-init.sh | tr -d ' ')
+  if [ "$LINES" -gt 50 ]; then
+    echo ""
+    echo "ERROR: railway-init.sh is $LINES lines (max ~40)."
+    echo "This file is a BOOTLOADER that hands off to chipbot/railway-init.sh."
+    echo "All Railway init logic belongs in chipbot, not clawdbot."
+    echo "See CLAUDE.md 'Fork-Local Files' section."
+    echo ""
+    exit 1
+  fi
+  if ! grep -q 'exec sh "$INIT_SCRIPT"' railway-init.sh; then
+    echo ""
+    echo "ERROR: railway-init.sh missing 'exec sh \"\$INIT_SCRIPT\"' handoff."
+    echo "This file must be a bootloader that hands off to chipbot."
+    echo "See CLAUDE.md 'Fork-Local Files' section."
+    echo ""
+    exit 1
+  fi
+fi
+
 exit 0

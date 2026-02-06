@@ -127,6 +127,18 @@
 
 - Rebrand/migration issues or legacy config/service warnings: run `openclaw doctor` (see `docs/gateway/doctor.md`).
 
+## Fork-Local Files (Railway/Chipbot)
+
+**CRITICAL — Read this before touching Railway files or merging upstream.**
+
+- `railway-init.sh` and `railway.toml` are **fork-local bootloaders** protected by `.gitattributes` (`merge=ours`). They must NEVER be overwritten with upstream changes.
+- `railway-init.sh` is a ~30 line bootloader that clones the chipbot workspace and hands off to `chipbot/railway-init.sh`. If it grows beyond ~40 lines, something is WRONG — all Railway init logic belongs in chipbot, not clawdbot.
+- The pre-commit hook (`git-hooks/pre-commit`) blocks commits if the bootloader is >50 lines or missing the handoff.
+- When merging upstream: these files are auto-protected by the merge driver, but verify after merge that they still contain the bootloader (look for `exec sh "$INIT_SCRIPT"`).
+- Railway auto-deploy from main is DISABLED (disconnected in Railway dashboard). Deploys are manual via `chipbot/scripts/railway-deploy.sh`.
+- **After fresh clone:** run `scripts/setup-fork.sh` to configure the merge driver. Without this, `.gitattributes` `merge=ours` does nothing.
+- **Do NOT** add Railway customization (env var mapping, config copying, doctor handling, channel setup) to clawdbot. It all goes in `chipbot/railway-init.sh`.
+
 ## Agent-Specific Notes
 
 - Vocabulary: "makeup" = "mac app".

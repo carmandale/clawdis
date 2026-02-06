@@ -1,1 +1,7 @@
 * text=auto eol=lf
+
+# Chipbot fork-local files: NEVER overwrite during upstream merges.
+# These are bootloaders that hand off to chipbot workspace scripts.
+# See CLAUDE.md "Fork-Local Files" section.
+railway-init.sh merge=ours
+railway.toml merge=ours
