@@ -12,7 +12,7 @@
 set -e
 
 WORKSPACE_DIR="/data/.clawdbot/workspace/chipbot"
-WORKSPACE_REPO="https://github.com/carmandale/chipbot.git"
+WORKSPACE_REPO="https://github.com/carmandale/clawdbot-workspace.git"
 
 echo "[bootloader] Starting workspace bootstrap..."
 
@@ -20,7 +20,8 @@ mkdir -p /data/.clawdbot/workspace
 
 if [ -d "$WORKSPACE_DIR/.git" ]; then
   echo "[bootloader] Pulling latest workspace..."
-  (cd "$WORKSPACE_DIR" && git pull --ff-only) || {
+  # Ensure remote URL is correct (may have been stale from previous deploys)
+  (cd "$WORKSPACE_DIR" && git remote set-url origin "$WORKSPACE_REPO" && git pull --ff-only) || {
     echo "[bootloader] WARNING: git pull failed, continuing with existing workspace"
   }
 else
