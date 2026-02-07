@@ -388,10 +388,13 @@ export class QmdMemoryManager implements MemorySearchManager {
       }
       await this.runQmd(["update"], { timeoutMs: 120_000 });
       const embedIntervalMs = this.qmd.update.embedIntervalMs;
+      // embedInterval=0 is an explicit opt-out: never embed, even on first boot.
+      // This lets deployments use BM25-only search without downloading ~1GB of models.
       const shouldEmbed =
-        Boolean(force) ||
-        this.lastEmbedAt === null ||
-        (embedIntervalMs > 0 && Date.now() - this.lastEmbedAt > embedIntervalMs);
+        embedIntervalMs > 0 &&
+        (Boolean(force) ||
+          this.lastEmbedAt === null ||
+          Date.now() - this.lastEmbedAt > embedIntervalMs);
       if (shouldEmbed) {
         try {
           await this.runQmd(["embed"], { timeoutMs: 120_000 });
