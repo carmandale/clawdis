@@ -1,6 +1,7 @@
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import type { loadOpenClawPlugins } from "../plugins/loader.js";
+import { listAgentIds } from "../agents/agent-scope.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import {
@@ -16,6 +17,8 @@ import {
 } from "../hooks/internal-hooks.js";
 import { loadInternalHooks } from "../hooks/loader.js";
 import { isTruthyEnvValue } from "../infra/env.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
+import { getMemorySearchManager } from "../memory/index.js";
 import { type PluginServicesHandle, startPluginServices } from "../plugins/services.js";
 import { startBrowserControlServerIfEnabled } from "./server-browser.js";
 import {
@@ -126,6 +129,19 @@ export async function startGatewaySidecars(params: {
     params.logChannels.info(
       "skipping channel start (OPENCLAW_SKIP_CHANNELS=1 or OPENCLAW_SKIP_PROVIDERS=1)",
     );
+  }
+
+  // Eagerly warm memory search managers so QMD session export and periodic
+  // indexing start immediately, instead of waiting for the first memory_search
+  // tool call. This is fire-and-forget: failures are logged, not fatal.
+  {
+    const memLog = createSubsystemLogger("memory");
+    const agentIds = listAgentIds(params.cfg);
+    for (const agentId of agentIds) {
+      void getMemorySearchManager({ cfg: params.cfg, agentId }).catch((err) => {
+        memLog.warn(`eager memory warm-up failed for agent ${agentId}: ${String(err)}`);
+      });
+    }
   }
 
   if (params.cfg.hooks?.internal?.enabled) {
