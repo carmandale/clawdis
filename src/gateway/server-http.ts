@@ -479,10 +479,18 @@ export function createGatewayHttpServer(opts: {
       return;
     }
 
+    // Railway health check endpoint - no auth required
+    const requestPath = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (requestPath === "/health") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }));
+      return;
+    }
+
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
-      const requestPath = new URL(req.url ?? "/", "http://localhost").pathname;
       if (await handleHooksRequest(req, res)) {
         return;
       }
