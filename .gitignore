@@ -3,7 +3,7 @@ node_modules
 .env
 docker-compose.extra.yml
 dist
-pnpm-lock.yaml
+# pnpm-lock.yaml is needed for Docker builds - DO NOT ignore
 bun.lock
 bun.lockb
 coverage
