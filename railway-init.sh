@@ -24,6 +24,8 @@ mkdir -p /data/.clawdbot/workspace
 
 if [ -d "$WORKSPACE_DIR/.git" ]; then
   echo "[bootloader] Pulling latest workspace..."
+  # Clean up stale lock files from previous container crashes
+  rm -f "$WORKSPACE_DIR/.git/index.lock" "$WORKSPACE_DIR/.git/HEAD.lock" 2>/dev/null || true
   (cd "$WORKSPACE_DIR" && git remote set-url origin "$WORKSPACE_REPO" && git pull --ff-only) || {
     echo "[bootloader] WARNING: git pull failed, continuing with existing workspace"
   }
