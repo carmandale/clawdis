@@ -1,5 +1,5 @@
 [build]
-# Railway will use Dockerfile when present (no builder needed)
+builder = "dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
