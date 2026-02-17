@@ -2,8 +2,9 @@
 builder = "dockerfile"
 
 [deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+# Temporarily disable healthcheck to debug deployment issues
+# healthcheckPath = "/health"
+# healthcheckTimeout = 300
 # Temporarily disabled preDeployCommand for debugging
 # preDeployCommand = "if [ ! -d /data/.clawdbot/workspace/chipbot/.git ]; then mkdir -p /data/.clawdbot/workspace && git clone https://github.com/carmandale/chipbot.git /data/.clawdbot/workspace/chipbot; else cd /data/.clawdbot/workspace/chipbot && git fetch && git checkout main && git pull --ff-only; fi"
 startCommand = "sh /app/railway-init.sh"
